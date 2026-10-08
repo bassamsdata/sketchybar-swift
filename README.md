@@ -4,6 +4,10 @@ A [SketchyBar](https://github.com/FelixKratz/SketchyBar) setup built around the 
 
 ![bar](screenshots/bar.png)
 
+Full screen:
+
+![full screen](screenshots/desktop.png)
+
 On a display without a notch the media island ends 5pt left of the screen centre:
 
 ![bar on a display without a notch](screenshots/bar-no-notch.png)

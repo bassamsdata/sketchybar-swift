@@ -4,3 +4,4 @@ __pycache__/
 helper/*
 !helper/*.swift
 !helper/build.sh
+_captures/
