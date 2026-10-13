@@ -51,8 +51,8 @@ print(int(r['origin'][0]+r['size'][0]+f['label']['width']-fr['size'][0])-int(sys
   else f=(--set media.fill drawing=on padding_left=$pl label.width=$fw padding_right=$(( -fw ))
           --set media.fill.r drawing=on padding_left=$w label.width=$rw padding_right=$(( -w - rw ))
           --set media.fill.c drawing=on padding_left=$w label.width=$(( iin - w )) padding_right=$(( -w - (iin - w) ))); fi
-  # animate (0.2 s) only when the island width changes. Otherwise apply at once (the 2 s refresh where only progress changed)
-  local A=(--animate tanh 12); [ "$(cat "$HOME/.cache/sketchybar/media_iw" 2>/dev/null)" = $iw ] && A=(); echo $iw > "$HOME/.cache/sketchybar/media_iw"
+  # animate (0.2 s) only when the island width changes. Otherwise apply at once (the 2 s refresh where only progress changed), and at startup (SB_BOOT)
+  local A=(--animate tanh 12); { [ -n "$SB_BOOT" ] || [ "$(cat "$HOME/.cache/sketchybar/media_iw" 2>/dev/null)" = $iw ]; } && A=(); echo $iw > "$HOME/.cache/sketchybar/media_iw"
   # the app-name cell width is also fixed to the computed value (icon.width includes icon.padding_right 8) — rounding of the glyph width (7.2pt×n) differs from SketchyBar's, which left the island 1pt off (±1 per app name, 2026-10-01)
   sketchybar --set media label="$text" "${A[@]}" --set media icon.width=$(( aw + 8 )) label.width=$tw "${f[@]}"
   [ -z "$LE_GROW" ] && rmdir "$HOME/.cache/sketchybar/front_app.lock" 2>/dev/null   # hold the lock only while computing and applying the fill (not through the popup and album-art work below)

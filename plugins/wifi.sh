@@ -68,5 +68,7 @@ if [ -n "${CUR:-}" ]; then
 fi
 sketchybar "${a[@]}" 2>/dev/null
 
-if [ -n "$IP" ]; then anim_label wifi "${SSID:-on}" label.color=$TEXT
+# The bar shows the name as is; over 16 characters it becomes 15 + … (the old label.max_chars=10 cut the last letter of an 11-character name). anim_label sizes the cell to the text
+SHOW=$(perl -CSA -Mutf8 -e '$_ = shift; print length > 16 ? substr($_, 0, 15) . "…" : $_' "${SSID:-on}")
+if [ -n "$IP" ]; then anim_label wifi "$SHOW" label.color=$TEXT
 else anim_label wifi "off" label.color=$ERR; fi

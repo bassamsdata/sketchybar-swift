@@ -11,10 +11,15 @@ POPUP_BLUR=20   # popups are redrawn on every open, so no blur problem
 WORDMARK="sketchybar"                         # tag at the far left — change it (your name / handle)
 TERMINAL_APP="Ghostty"                        # terminal opened from popups
 NOTIF_APPS=("Slack" "Mail" "Messages")        # apps whose Dock badges are summed
+CAL_NEXT=0                                    # next-event text on the left island ("10:00 standup +8m"). 0 = off, 1 = on. Separate from the calendar popup
 CAL_WINDOW_MIN=60                             # only events within this many minutes are shown on the bar
 CWD_FILE="$HOME/.cache/sketchybar/cwd"
 WORK_DIR="$HOME/workspace"                    # ports popup: shows only servers started under this folder — change it (your projects folder)
 HOLIDAY_CAL=""                                # name of a subscribed holiday calendar in Calendar.app, e.g. "US Holidays" or "대한민국 공휴일"; empty = no holidays
+
+# pilo circle: state of your Pilo agents as a small pixel character (https://github.com/garamnohhh/pilo). Shows only when the `pilo` command exists and answers. 0 = off
+PILO_ISLAND=1
+PILO_ANIM=1                                   # pilo circle motion. 0 = still image (macOS Reduce Motion also stops it)
 
 # auto-maximize new windows (Rectangle, keeping the window gap). 0 = off. Excluded apps are a regex (app names)
 AUTOMAX=1

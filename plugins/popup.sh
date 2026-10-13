@@ -13,12 +13,16 @@
 # The look follows the popup in Sketchybar_dark_light.html (rev 5):
 #   title row 11px Bold·text-2 · row height 24 · left cell 52px·text-3 · left/right padding 12 · top/bottom 4
 
-POPUP_PARENTS="cpu.ul bat agent ports ts docker ci media vol.ul cal wifi clock front_app"
+POPUP_PARENTS="cpu.ul pilo.ul bat agent ports ts docker ci media vol.ul cal wifi clock front_app"
 POPUP_CACHE="$HOME/.cache/sketchybar"
 
 POPUP_LIB="${BASH_SOURCE[0]}"
 POPUP_OPEN="$POPUP_CACHE/popup_open"   # name of the popup open now. Absent = closed
 CLICKAWAY="${POPUP_LIB%/plugins/*}/helper/clickaway"   # outside-click detection (runs only while a popup is open)
+
+# The underline item of a circle (<circle>.ul) only shows while its window sits above the circle's. Clicking the circle makes macOS raise
+# that window over the underline, so when a popup opens the underline is --move'd to the same place to rebuild the window order (no layout change)
+popup_raise() { case "$1" in cpu.ul|pilo.ul) sketchybar --move "$1" after "${1%.ul}" 2>/dev/null ;; esac; }
 
 popup_under() { case "$1" in bat) echo bat.u ;; agent) echo agent.u ;; *) echo "$1" ;; esac; }   # item that draws the underline
 
@@ -37,6 +41,7 @@ popup_toggle() {  # bar item click: close if open; otherwise close the others an
   if [ "$(cat "$POPUP_OPEN" 2>/dev/null)" = "$1" ]; then popup_close_all; return; fi
   popup_close_all "$1"
   local u b=(); for u in $(popup_under "$1"); do b+=(--set $u background.drawing=on); done
+  popup_raise "$1"
   sketchybar --set "$1" popup.drawing=on "${b[@]}"
   echo "$1" > "$POPUP_OPEN"
   [ -x "$CLICKAWAY" ] && (nohup "$CLICKAWAY" "source '$POPUP_LIB'; popup_close_all" >/dev/null 2>&1 &)
@@ -45,6 +50,7 @@ popup_toggle() {  # bar item click: close if open; otherwise close the others an
 popup_rows() {
   local p="$1" title="$2" data n old i=0 k v c click cs a=()
   data=$(cat)
+  [ -n "$SB_BOOT" ] && return 0   # at startup (first values in sketchybarrc) no popup rows are built - the --update after the bar shows builds them
   mkdir -p "$POPUP_CACHE"
   [ "$title"$'\n'"$data" = "$(cat "$POPUP_CACHE/popup.$p" 2>/dev/null)" ] && return 0   # nothing changed
   n=$(grep -c . <<<"$data")
@@ -95,5 +101,6 @@ popup_rows() {
 anim_label() {  # <item> <text> [more --set etc.] — change the text and animate the width over 0.2s (so the island width does not jump)
   local it="$1" t="$2" w; shift 2
   w=$(perl "${POPUP_LIB%/*}/width.pl" "$t")   # text width only — gaps between cells go in item padding (kept out of label.width)
+  [ -n "$SB_BOOT" ] && { sketchybar --set "$it" label="$t" "$@" label.width=$w; return; }   # at startup apply at once (the bar is still off screen)
   sketchybar --set "$it" label="$t" "$@" --animate tanh 12 --set "$it" label.width=$w
 }

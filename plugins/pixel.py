@@ -70,3 +70,52 @@ for k in range(1, 5):
                         for xx in range(X0 + x0, X0 + x1): g[yy][xx] = col
         g = [[g[y][x] if inside_px(x, y) else None for x in range(66)] for y in range(66)]
         png_px(f'{out}/cc_{k}{wname}.png', g)
+# pilo circle (optional): a round face with two arms = the state of your Pilo agents. No mark icons - arm pose, expression and color only
+#   16×12 cells (3px each = 48×36px), dead centre of the 66px circle: origin (9, 15) → centre (33, 33). Body 10×10 cells (cols 3~12 · rows 1~10), arms 3 cells on each side
+#   pilo_<state>_<frame>.png (66×66) · pilo_s_<state>_<frame>.png (popup rows, 2px cells = 16×12pt)
+ERR = rgba(sys.argv[5]) if len(sys.argv) > 5 else W
+BODY = ['...####...', '.########.'] + ['##########'] * 6 + ['.########.', '...####...']   # rows 1~10
+ARM = {'down': [(6, 2), (7, 1), (8, 1)], 'mid': [(6, 2), (6, 1), (6, 0)], 'up': [(5, 2), (4, 1), (3, 0)], 'upb': [(5, 2), (4, 1), (3, 1)],
+       'droop': [(7, 2), (8, 2), (9, 2)], 'head': [(4, 2), (3, 2), (2, 3), (1, 4)], 'headb': [(4, 2), (3, 2), (2, 3)], 'tuck': [(7, 2), (8, 2)], None: []}
+EYES = {'open': [(4, 5), (5, 5)], 'shut': [(5, 4), (5, 5)], 'x': [(4, 4), (4, 6), (5, 5), (6, 4), (6, 6)], 'gt': [(4, 4), (5, 5), (6, 4)], 'dot': [(5, 5)]}   # left eye (the right one is mirrored)
+MOUTH = {'smile': [(7, 6), (8, 7), (8, 8), (7, 9)], 'o': [(8, 7), (8, 8)], 'flat': [(8, 6), (8, 7), (8, 8), (8, 9)], 'frown': [(8, 6), (7, 7), (7, 8), (8, 9)],
+         'low': [(8, 6), (8, 7), (8, 8), (8, 9)], 'low1': [(8, 7), (8, 8), (8, 9)], '': []}   # low/low1 = empty gauge (one cell left ↔ none)
+#  state: color, frames [(left arm, right arm, eyes, mouth, breathing)]
+POSES = {
+  'running': (T,   [('up', 'down', 'open', 'smile', 0), ('mid', 'mid', 'open', 'smile', 0), ('down', 'up', 'open', 'smile', 0), ('mid', 'mid', 'open', 'smile', 0)]),   # arms swinging in turn
+  'blocked': (W,   [('down', 'up', 'open', 'o', 0), ('down', 'upb', 'open', 'o', 0)]),                 # one arm up, waving
+  'stalled': (W,   [('droop', 'droop', 'dot', 'frown', 0), ('droop', 'droop', 'shut', 'frown', 0)]),   # arms limp, slow blink
+  'failed':  (ERR, [('up', 'up', 'x', 'flat', 0), ('upb', 'upb', 'x', 'flat', 0)]),                    # both arms up, flailing
+  'gaveUp':  (ERR, [('head', 'head', 'shut', 'flat', 0), ('headb', 'headb', 'shut', 'flat', 0)]),      # holding its head
+  'limited': (T3,  [('down', 'down', 'gt', 'low1', 0), ('down', 'down', 'gt', 'low', 0)]),             # arms down, empty gauge
+  'idle':    (T3,  [('tuck', 'tuck', 'shut', '', 0), ('tuck', 'tuck', 'shut', '', 1)]),                # arms tucked, asleep (breathing)
+  'unbound': (T3,  [(None, None, None, '', 0)]),                                                      # dim outline
+}
+def pose(state, k):  # 16×12 cells → color or None
+    col, frames = POSES[state]; la, ra, e, m, br = frames[k]
+    g = [[None] * 16 for _ in range(12)]
+    rows = BODY[1:] if br else BODY   # breathing: one cell shorter (the top comes down)
+    for r, line in enumerate(rows):
+        for c, ch in enumerate(line):
+            if ch == '#': g[r + 1 + br][c + 3] = col
+    if e is None:   # no session: outline only
+        full = [[bool(x) for x in row] for row in g]
+        for r in range(12):
+            for c in range(16):
+                if full[r][c] and all(0 <= r + dr < 12 and 0 <= c + dc < 16 and full[r + dr][c + dc] for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1))): g[r][c] = None
+        return g
+    for r, c in EYES[e] + MOUTH[m]: g[r][c] = None
+    for r, c in EYES[e]: g[r][15 - c] = None
+    for r, c in ARM[la]: g[r][c] = col
+    for r, c in ARM[ra]: g[r][15 - c] = col
+    return g
+for st, (_, frames) in POSES.items():
+    for k in range(len(frames)):
+        g = [[None] * 66 for _ in range(66)]
+        for r, row in enumerate(pose(st, k)):
+            for c, col in enumerate(row):
+                if col:
+                    for yy in range(15 + r * 3, 18 + r * 3):
+                        for xx in range(9 + c * 3, 12 + c * 3): g[yy][xx] = col
+        png_px(f'{out}/pilo_{st}_{k + 1}.png', [[g[y][x] if inside_px(x, y) else None for x in range(66)] for y in range(66)])
+    for k in range(len(frames)): png(f'{out}/pilo_s_{st}_{k + 1}.png', pose(st, k))   # popup rows move with the same frames

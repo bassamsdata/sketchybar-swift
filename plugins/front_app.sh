@@ -17,6 +17,7 @@ esac
 # previous name and fill position come from the cache (written by this script and media.sh). Under an event burst sketchybar --query sometimes returns empty → previous width computed as 0 and the island jumps a lot (measured 10-06)
 FA="$HOME/.cache/sketchybar/front_app.last"; MP="$HOME/.cache/sketchybar/media_pl"
 old=$(cat "$FA" 2>/dev/null); [ -n "$old" ] || old=$(sketchybar --query "$NAME" 2>/dev/null | python3 -c "import json,sys;print(json.load(sys.stdin)['label']['value'])" 2>/dev/null)
+[ -n "$SB_BOOT" ] && { sketchybar --set "$NAME" label="$n" label.width=$(perl "$P/width.pl" "$n"); echo "$n" > "$FA"; exit 0; }   # at startup (bar still off screen): apply at once, no animation or island ordering. sketchybarrc fits the media island right after
 wo=$(perl "$P/width.pl" "$old"); wn=$(perl "$P/width.pl" "$n")   # text width only (padding is item padding)
 MEDIA=1   # the media island is always present (checking by query returns empty under an event burst, giving 0 and skipping the fill correction)
 if [ "$wn" -gt "$wo" ] && [ $MEDIA = 1 ]; then
