@@ -1,34 +1,44 @@
-// SketchyBar Wi-Fi Scan.app — writes nearby Wi-Fi names (SSID) and signal to ~/.cache/sketchybar/wifiscan.txt as "name<TAB>RSSI" and exits
-// macOS gives SSIDs only to apps with Location permission → this tiny app holds that permission (allow once on first run). The location itself is never used
-// First line is the status: ok | denied | undetermined. Run: open -g -W -a <this app> (only when the popup opens)
+// On-demand Wi-Fi scanning. SSIDs are returned as JSON, never cached on disk.
 import AppKit
 import CoreLocation
 import CoreWLAN
-let out = URL(fileURLWithPath: NSHomeDirectory() + "/.cache/sketchybar/wifiscan.txt")
-func write(_ s: String) { try? s.write(to: out, atomically: true, encoding: .utf8) }
-final class D: NSObject, CLLocationManagerDelegate {
-  let m = CLLocationManager()
-  func start() { m.delegate = self; check() }
-  func check() {
-    switch m.authorizationStatus {
-    case .authorizedAlways, .authorized: scan()
-    case .notDetermined: m.requestWhenInUseAuthorization()
-    default: write("denied\n"); exit(0)
-    }
-  }
-  func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) { if m.authorizationStatus != .notDetermined { check() } }
-  func scan() {
-    var lines = ["ok"]
-    if let i = CWWiFiClient.shared().interface(), let ns = try? i.scanForNetworks(withSSID: nil) {
-      var best: [String: Int] = [:]
-      for n in ns { if let s = n.ssid { best[s] = max(best[s] ?? -999, n.rssiValue) } }
-      for (s, r) in best.sorted(by: { $0.value > $1.value }) { lines.append("\(s)\t\(r)") }
-    }
-    write(lines.joined(separator: "\n") + "\n"); exit(0)
+
+func emit(_ value: Any) {
+  if let data = try? JSONSerialization.data(withJSONObject: value) {
+    FileHandle.standardOutput.write(data)
   }
 }
-let d = D()
-DispatchQueue.main.async { d.start() }
-DispatchQueue.main.asyncAfter(deadline: .now() + 60) { write("undetermined\n"); exit(0) }   // exit after 1 minute if the permission prompt goes unanswered
-NSApplication.shared.setActivationPolicy(.accessory)
+final class Scanner: NSObject, CLLocationManagerDelegate {
+  let manager = CLLocationManager()
+  func start() { manager.delegate = self; check() }
+  func check() {
+    switch manager.authorizationStatus {
+    case .authorizedAlways, .authorized: scan()
+    case .notDetermined: manager.requestWhenInUseAuthorization()
+    default: emit(["status": "denied", "networks": []] as [String: Any]); exit(0)
+    }
+  }
+  func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+    if manager.authorizationStatus != .notDetermined { check() }
+  }
+  func scan() {
+    var best: [String: Int] = [:]
+    if let interface = CWWiFiClient.shared().interface(),
+       let networks = try? interface.scanForNetworks(withSSID: nil) {
+      for network in networks {
+        if let ssid = network.ssid { best[ssid] = max(best[ssid] ?? -999, network.rssiValue) }
+      }
+    }
+    let rows = best.sorted { $0.value > $1.value }.map {
+      ["ssid": $0.key, "rssi": $0.value] as [String: Any]
+    }
+    emit(["status": "ok", "networks": rows]); exit(0)
+  }
+}
+let scanner = Scanner()
+DispatchQueue.main.async { scanner.start() }
+DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
+  emit(["status": "undetermined", "networks": []] as [String: Any]); exit(0)
+}
+NSApplication.shared.setActivationPolicy(.prohibited)
 NSApplication.shared.run()

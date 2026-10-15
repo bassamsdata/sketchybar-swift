@@ -3,10 +3,17 @@
 //   audio set <ID>   → change the default output device. Non-zero exit code on failure
 //   audio bt         → paired but unconnected Bluetooth audio devices "address<TAB>name" (the ones Control Center lists too). Takes about 4 s, so vol.sh caches it in the background
 //   audio connect <address> → connect and, once it appears as an audio device (up to 8 s), make it the default output. Non-zero exit code on failure
-//   audio watch "<command>" → run the command whenever mute or the default output device changes (stays running). SketchyBar's volume_change doesn't fire for mute (keyboard mute key)
+//   audio watch → emit a line when mute/output changes. The parent owns its lifetime.
 import CoreAudio
 import Foundation
 import IOBluetooth
+import Darwin
+
+func emit(_ value: Any) {
+  if let data = try? JSONSerialization.data(withJSONObject: value) {
+    FileHandle.standardOutput.write(data); print(""); fflush(stdout)
+  }
+}
 
 func prop(_ sel: AudioObjectPropertySelector, _ scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal) -> AudioObjectPropertyAddress {
   AudioObjectPropertyAddress(mSelector: sel, mScope: scope, mElement: kAudioObjectPropertyElementMain)
@@ -54,10 +61,11 @@ func outputs() -> [(AudioDeviceID, String, String)] {
 }
 if args.count >= 2, args[1] == "bt" {
   let live = Set(outputs().map { $0.1 })
+  var devices: [[String: String]] = []
   for d in (IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice]) ?? [] where d.deviceClassMajor == 4 && !d.isConnected() {   // 4 = audio
-    if let n = d.name, !live.contains(n) { print("\(d.addressString ?? "")\t\(n)") }
+    if let n = d.name, !live.contains(n) { devices.append(["address": d.addressString ?? "", "name": n]) }
   }
-  exit(0)
+  emit(devices); exit(0)
 }
 if args.count >= 3, args[1] == "connect", let d = IOBluetoothDevice(addressString: args[2]) {
   guard d.openConnection() == kIOReturnSuccess else { exit(1) }
@@ -71,24 +79,21 @@ if args.count >= 3, args[1] == "connect", let d = IOBluetoothDevice(addressStrin
   }
   exit(1)
 }
-if args.count >= 3, args[1] == "watch" {
-  let cmd = args[2]
-  func run() { let t = Process(); t.launchPath = "/bin/sh"; t.arguments = ["-c", cmd]; try? t.run() }
+if args.count == 2, args[1] == "watch" {
+  func changed() { print("changed"); fflush(stdout) }
   var dev = AudioDeviceID(0)
   var muteAddr = prop(kAudioDevicePropertyMute, kAudioDevicePropertyScopeOutput)
-  let onMute: AudioObjectPropertyListenerBlock = { _, _ in run() }
+  let onMute: AudioObjectPropertyListenerBlock = { _, _ in changed() }
   func attach() {
     if dev != 0 { AudioObjectRemovePropertyListenerBlock(dev, &muteAddr, DispatchQueue.main, onMute) }
     dev = defaultOut(); AudioObjectAddPropertyListenerBlock(dev, &muteAddr, DispatchQueue.main, onMute)
   }
   attach()
   var defAddr = prop(kAudioHardwarePropertyDefaultOutputDevice)
-  AudioObjectAddPropertyListenerBlock(sys, &defAddr, DispatchQueue.main) { _, _ in attach(); run() }   // when the device changes, resubscribe to the new device's mute
-  Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in   // exit when SketchyBar is gone (no orphans)
-    let t = Process(); t.launchPath = "/usr/bin/pgrep"; t.arguments = ["-x", "sketchybar"]; try? t.run(); t.waitUntilExit()
-    if t.terminationStatus != 0 { exit(0) }
-  }
+  AudioObjectAddPropertyListenerBlock(sys, &defAddr, DispatchQueue.main) { _, _ in attach(); changed() }   // when the device changes, resubscribe to the new device's mute
   RunLoop.main.run()
 }
 let cur = defaultOut()
-for (id, n, kind) in outputs() { print("\(id)\t\(n)\t\(kind)\t\(id == cur ? 1 : 0)") }
+emit(outputs().map { id, name, kind in
+  ["id": Int(id), "name": name, "kind": kind, "current": id == cur] as [String: Any]
+})

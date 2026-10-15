@@ -1,0 +1,92 @@
+{
+  "theme": "dark",
+  "animations": true,
+  "display": "main",
+  "wordmark": "sketchybar",
+  "height": 30,
+  "opacity": 85,
+  "popup_blur": 20,
+  "window_manager": "auto",
+  "work_dir": "~/Repos",
+  "calendar_names": [],
+  "holiday_calendar": "",
+  "notification_apps": [
+    "Slack",
+    "Mail",
+    "Messages"
+  ],
+  "features": {
+    "workspaces": true,
+    "front_app": true,
+    "folder": false,
+    "next_event": false,
+    "media": false,
+    "volume": true,
+    "calendar": true,
+    "wifi": false,
+    "wifi_scan": false,
+    "battery": true,
+    "usage": true,
+    "system": true,
+    "ports": true,
+    "tailscale": true,
+    "notifications": true
+  },
+  "width": 0,
+  "margin": 5,
+  "corner_radius": 13,
+  "circle_radius": 16,
+  "popup_corner_radius": 0,
+  "popup_width": 0,
+  "font": "CommitMonoGhostty",
+  "font_size": 12,
+  "wordmark_animation": false,
+  "containers": {
+    "left": {
+      "padding": 12,
+      "item_gap": 12,
+      "gap": 8,
+      "height": 0,
+      "corner_radius": -1,
+      "border_width": 1
+    },
+    "right": {
+      "padding": 12,
+      "item_gap": 14,
+      "gap": 0,
+      "height": 0,
+      "corner_radius": -1,
+      "border_width": 1
+    },
+    "media": {
+      "padding": 12,
+      "item_gap": 12,
+      "gap": 8,
+      "height": 0,
+      "corner_radius": -1,
+      "border_width": 1
+    },
+    "apps": {
+      "padding": 12,
+      "item_gap": 12,
+      "gap": 8,
+      "height": 0,
+      "corner_radius": -1,
+      "border_width": 1
+    },
+    "cat": {
+      "gap": 8,
+      "height": 0,
+      "corner_radius": -1,
+      "border_width": 1
+    },
+    "settings": {
+      "gap": 8,
+      "height": 0,
+      "corner_radius": -1,
+      "border_width": 1
+    }
+  },
+  "wm_number_bold": true,
+  "cat_grass_color": "auto"
+}

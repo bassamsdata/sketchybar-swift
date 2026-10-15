@@ -1,108 +1,268 @@
-# sketchybar-island
+# sketchybar-island — personal, hardened edition
 
-A [SketchyBar](https://github.com/FelixKratz/SketchyBar) setup built around the MacBook notch: two "islands" left and right of the notch, a media island that fills the space up to it, and small popups for everything.
+A notch-aware SketchyBar configuration for macOS, adapted from
+[garamnohhh/sketchybar-island](https://github.com/garamnohhh/sketchybar-island).
+The bar keeps the rounded islands, dark/light themes and compact popups, with
+AeroSpace/OmniWM virtual workspaces and a quieter runtime.
 
-![bar](screenshots/bar.png)
+The upstream screenshots in `screenshots/` are the visual reference. This edition
+restores the cursor, original pixel cat/port/Tailscale art, five-cell gauges,
+agent glyphs, equalizer and media progress fill within the hardened runtime.
+The workspace cell retains the AeroSpace/OmniWM behavior described below.
 
-Full screen:
+## Included
 
-![full screen](screenshots/desktop.png)
+- Wordmark, focused workspace and focused app/menu popup.
+- Media information and controls via media-control (Apple Music excluded).
+- Volume slider, mute and audio/Bluetooth output switching.
+- Date/time, month calendar, optional upcoming event and holiday calendar colors.
+- Wi-Fi/IP/router; scanning and saved-network switching are opt-in.
+- Battery and an owned keep-awake process; this does not override lid-close rules.
+- Cached Claude Code/Codex usage, CPU/RAM/SSD, development ports and Tailscale.
+- Optional folder/Git branch, Dock badge totals and a settings popup.
 
-On a display without a notch the media island ends 5pt left of the screen centre:
+Removed: GitHub/gh/CI/PR widgets, Docker/OrbStack integration, Ollama model queries,
+Pilo, Apple Music fallback, Rectangle auto-maximize, browser JavaScript and remote
+artwork downloads. Visual animation uses one owned task in the existing runtime:
+the cat runs at up to four frames/second, cursor at 1 Hz, and equalizer at 2 Hz.
+Set `animations: false` for static artwork; macOS Reduce Motion also makes it static.
+`wordmark_animation` controls only cursor blinking and defaults to false, leaving
+the cat animated when `animations` is true.
 
-![bar on a display without a notch](screenshots/bar-no-notch.png)
+## Workspaces
 
-| | |
-|---|---|
-| ![media popup](screenshots/popup-media.png) | ![calendar popup](screenshots/popup-calendar.png) |
-| ![wifi popup](screenshots/popup-wifi.png) | ![agent usage popup](screenshots/popup-agent.png) |
-| ![tailscale popup](screenshots/popup-tailscale.png) | ![volume popup](screenshots/popup-volume.png) |
+`window_manager` accepts `auto`, `aerospace`, `omniwm` or `off`.
+`auto` prefers a responding AeroSpace and falls back to a responding OmniWM.
+The OmniWM CLI is also found inside `/Applications/OmniWM.app`.
 
-The Pilo circle and its popup (needs [Pilo](https://pilo.garamnoh.workers.dev), see below):
+The cell shows `3 ▾`, or `3 [max] ▾` when maximized. Click to expand a popup of
+**occupied workspaces only**, including their app names/window counts. Click a
+row to focus it. Occupied workspaces across monitors are included. An empty
+current workspace is still shown on the bar but excluded from the popup.
 
-<img src="screenshots/popup-pilo.png" alt="pilo popup" width="530">
+For AeroSpace, `[max]` is its own `fullscreen` state, not native macOS Full Screen.
+For OmniWM, it reflects `isFullscreen`. OmniWM Niri column width/maximize is not
+the same state and is not inferred from window geometry.
 
-## What's in it
+Current CLIs provide subscriptions, so **no WM configuration hooks are required**:
 
-- **Left island** - wordmark, spaces, front app (click: the app's menus in a popup)
-- **Media island** - now playing with a progress fill, controls, volume + output device switcher
-- **Circles** - settings, a pixel cat that runs faster with CPU load (click: CPU / memory / SSD space), listening ports, Tailscale devices
-- **Pilo circle** *(optional, needs Pilo)* - a small pixel character that acts out the most urgent state of your [Pilo](https://pilo.garamnoh.workers.dev) agents with its arms, face and colour: working, waiting on you, stalled, failed, wake failed, limited, no session, idle. Click it for a popup that lists every agent with its own moving face, plus a legend of the eight states. **This part only works with Pilo installed** (npm release coming soon). Without the `pilo` command the circle hides itself and takes no space; the rest of the bar is unaffected
-- **Right island** - Claude Code / Codex usage, battery, Wi-Fi (saved networks in range), calendar with holidays
-- Dark / light theme, works on displays with or without a notch (no notch: the media island ends 5pt left of the screen centre)
+- AeroSpace: `subscribe` focus/workspace/monitor/window/binding events.
+- OmniWM: `subscribe` active-workspace/focus/windows/layout channels.
 
-## Requirements
+Events coalesce for 150 ms. A 30 s recovery check handles missing events, CLI
+commands outside bindings, WM restarts and switching managers. Full window
+inventory is queried only while the popup is open. Neither native macOS Spaces
+nor Rectangle controls are used. The bar never changes your WM configuration.
 
-- macOS 14+ (developed on macOS 26/27, Apple silicon)
-- [Homebrew](https://brew.sh) and Xcode Command Line Tools (`xcode-select --install`) - the helpers are small Swift files compiled on install
-- Installed by `install.sh`: SketchyBar, JetBrains Mono, JetBrainsMono Nerd Font, [media-control](https://github.com/ungive/media-control)
+OmniWM also requires **Enable IPC** in its status bar menu; IPC is disabled by
+default. Its bundled CLI is preferred to prevent client/app protocol mismatches.
+The workspace cell distinguishes `omni IPC`, `omni auth`, and `omni version`
+errors from an active workspace; click it for the corresponding explanation.
+After enabling IPC, the 30-second recovery check connects automatically.
 
-Optional - each part hides or degrades without it:
+References: [AeroSpace guide](https://nikitabobko.github.io/AeroSpace/guide),
+[AeroSpace commands](https://nikitabobko.github.io/AeroSpace/commands),
+[OmniWM queries](https://omniwm.app/reference/cli/queries/),
+[OmniWM events](https://omniwm.app/reference/cli/events/).
 
-| Tool | Used for |
-|---|---|
-| Claude Code / Codex | agent usage cell (hidden if neither is installed) |
-| [Rectangle](https://github.com/rxhanson/Rectangle) | auto-maximise new windows (`AUTOMAX` in `config.sh`) |
-| Ghostty | opening the config / long lists in a terminal (falls back to the default text editor) |
-| Tailscale, Docker / OrbStack, ollama, `gh` | their cells and popups |
-| [Pilo](https://pilo.garamnoh.workers.dev) (npm release coming soon) | the Pilo circle and popup (hidden without the `pilo` command) |
+## Prerequisites and installation
 
-## Install
+macOS 14+, Python 3.9+, Xcode Command Line Tools, SketchyBar, JetBrains Mono
+and JetBrainsMono Nerd Font Mono (settings and volume glyphs; Claude/Codex use bundled local artwork).
+AeroSpace/OmniWM have their own OS requirements. OmniWM needs macOS 26+.
+`media-control` is optional; disable `features.media` if not installed.
+
+Install prerequisites separately using the package sources/versions you trust:
 
 ```sh
-git clone https://github.com/garamnohhh/sketchybar-island.git && cd sketchybar-island
-bash install.sh
+brew tap FelixKratz/formulae
+brew install sketchybar
+brew install --cask font-jetbrains-mono font-jetbrains-mono-nerd-font
+brew install media-control  # only if keeping the media widget
 ```
 
-An existing `~/.config/sketchybar` is moved to `~/.config/sketchybar.bak.<timestamp>`.
+The installer **does not install or upgrade packages**, download scripts, edit
+shell/WM configuration, grant permissions or start/restart any service. It
+validates the JSON and compiles local Swift sources into a staging directory
+before touching the destination. Dependencies remain separately maintained; an
+installation records their binary paths and SHA-256 hashes for reference in
+`installed-dependencies.json`, not as a vulnerability audit or a package lock.
 
-One-time setup:
+```sh
+make check
+bash install.sh
+# Alternative isolated destination:
+bash install.sh --dest /absolute/path/to/sketchybar
+```
 
-1. System Settings → Menu Bar → *Automatically hide and show the menu bar*: **Always**
-2. Privacy & Security → **Accessibility**: allow `sketchybar` (front-app menu popup)
-3. First time you open the Wi-Fi popup: allow **Location** for "SketchyBar Wi-Fi Scan" (macOS only reveals nearby network names to apps with Location access; nothing is stored or sent)
-4. First time you open the calendar popup: allow **Calendars**
-5. Folder / git branch cell - add to `~/.zshrc`:
+An existing real `~/.config/sketchybar` is backed up with a unique timestamp only
+after preparation succeeds. A failed directory publish restores the previous
+configuration. Symlink destinations are rejected; choose a separate real
+destination if your dotfiles use a symlink. Custom destinations require passing
+their config to SketchyBar explicitly.
 
-   ```zsh
-   _sb_cwd() { sketchybar --trigger shell_cwd CWD="$PWD" &! }
-   precmd_functions+=(_sb_cwd)
-   ```
+Review `~/.config/sketchybar/config.json`, then start when ready:
 
-## Make it yours
+```sh
+brew services start sketchybar
+# If SketchyBar was already running:
+sketchybar --reload
+```
 
-Everything personal lives in **`config.sh`** - change these, then `sketchybar --reload`:
+If a service is already running during installation, it continues using its
+existing runtime until you reload/restart it. The installer does not manage
+another configuration's processes.
 
-| Setting | Meaning |
+## Configuration and permissions
+
+Edit `config.json`; it is validated data and never sourced as shell code.
+The settings popup opens it in the default text editor and provides a validated
+reload action. Appearance settings (points, unless noted):
+
+| Setting | Default | Meaning |
+|---|---:|---|
+| `width` | `0` | Automatic display width; a positive value centers a narrower bar area (minimum 600). |
+| `margin` | `5` | Minimum outside horizontal margin. |
+| `corner_radius` | `13` | Island corners. |
+| `circle_radius` | `16` | Settings/cat circles and the ports/Tailscale capsule. |
+| `popup_corner_radius` | `0` | Popup corners; zero matches the reference screenshots. |
+| `popup_width` | `0` | Per-popup reference widths; positive values override them (minimum 180). |
+| `height` | `30` | Bar and island height; circles and cat artwork scale with it. |
+| `font` | `CommitMonoGhostty` | Installed font family for bar text and popup text. |
+| `font_size` | `12` | Text size, 9–20; popup rows and reference widths scale with it. |
+| `wm_number_bold` | `true` | Bold only the leading workspace number; names, max status, and dropdown arrow remain regular. |
+| `cat_grass_color` | `"auto"` | Use a muted version of the theme accent, or set an explicit `"#RRGGBB"`; `"#26795a"` restores the original green. |
+
+`containers` accepts independent overrides for `left` (wordmark/workspaces/app),
+`right` (usage/battery/sound/clock), `media`, `apps` (ports/Tailscale), `cat`, and
+`settings`. Island defaults: `padding: 12`, `item_gap: 12` (`right: 14`), `gap: 8` (`right: 0`),
+`height: 0`, `corner_radius: -1`, `border_width: 1`. `height: 0` inherits the bar
+height; positive values must be 16 or greater and no taller than the bar.
+`corner_radius: -1` inherits the global island/circle radius. `gap` is the empty
+space to the next container on its right. For `right` it adds an inset from the
+screen edge, for `left` it separates optional media, and for `media` it separates
+the notch. Circles use
+`gap`, `height`, `corner_radius`, and `border_width`; padding/item gaps apply to
+islands. For example, adjust the capsule and main groups without changing code:
+
+```json
+"containers": {
+  "apps": {"gap": 10, "padding": 12, "item_gap": 14, "corner_radius": 10},
+  "right": {"padding": 12, "item_gap": 14}
+}
+```
+
+The dev Avra.nvim Appearance module exports its current palette to
+`appearance.json` and runs `sketchybar --reload` after explicit colorscheme or
+background changes. `:Appearance sketchybar off` restores the configured
+SketchyBar theme; `:Appearance refresh` forces synchronization. The generated
+file contains only validated color data with an ownership marker and checksum;
+it never changes layout or feature settings and makes no network requests.
+
+Reload after editing. A narrow width or larger font can require disabling some
+widgets to leave sufficient space around the notch. `features.media` is false;
+volume remains independently configurable and sits immediately left of the clock.
+`features.wifi` is false. The personal font default matches the installed Ghostty
+font; select another installed family if using this configuration elsewhere. Claude/Codex cells remain visible
+when the corresponding local tool directory exists; `—` means no fresh cached
+usage, and no network request is made to obtain it.
+
+`work_dir` defaults to `~/Repos`. Individual `features` booleans
+disable both the item and its work. Clock/settings/wordmark remain available.
+
+`calendar_names: []` reads all calendars; provide an explicit list of calendar
+names to restrict access. `holiday_calendar` colors events from that calendar.
+`features.calendar=false` keeps the clock/month grid without reading events.
+`features.next_event` is separate and off by default. Calendar queries request
+Calendars access for **SketchyBar Events** only when that feature is used.
+
+`features.wifi_scan` is off by default. Turning it on lets opening the Wi-Fi popup
+request Location for **SketchyBar WifiScan**, scan nearby networks and offer saved
+networks for switching. Network names are not written to disk. Without Location,
+macOS may hide the current SSID; the cell still shows on/off and the popup IP/router.
+No verbose-network logging, sudo command or Shortcuts automation is required.
+
+App-menu control and outside-click observation can require Accessibility for
+SketchyBar/helper processes. Grant only what retained features need. Basic
+workspace queries use the existing WM CLI; the WM manages its own permissions.
+
+For the optional folder/branch cell, enable `features.folder` and add this to zsh:
+
+```zsh
+_sb_cwd() { sketchybar --trigger shell_cwd CWD="$PWD" &! }
+precmd_functions+=(_sb_cwd)
+```
+
+## Performance and privacy
+
+One Python standard-library process owns the runtime. WM, audio and media
+subscriptions stay asleep between events. Media progress-only diffs stay in
+memory; they do not launch an extra media CLI query. Popup details are gathered
+on demand. Popup rows are rendered with a local AppKit helper, using bundled
+SVG icons and your configured font. No runtime icon/font download occurs. Changed properties alone are sent to SketchyBar.
+
+Sleep/wake query failures keep the runtime and click IPC alive. Failed health
+queries retry every 5 seconds, returning to the normal 30-second interval on
+recovery. Wake/display changes and query recovery clear cached properties,
+close stale popups, remeasure the display and refresh enabled widgets. Runtime
+start/stop, shutdown reasons and query failure/recovery transitions are logged
+without widget contents.
+
+| Work | Frequency |
 |---|---|
-| `WORDMARK` | the name at the left end |
-| `THEME` | `dark` \| `light` \| `auto` |
-| `BAR_DISPLAY` | `main`, or a display number from `sketchybar --query displays` |
-| `WORK_DIR` | ports popup lists servers started under this folder |
-| `HOLIDAY_CAL` | name of a subscribed holiday calendar in Calendar.app, e.g. `"US Holidays"` (empty = no holidays) |
-| `CAL_NEXT` | `1` shows the next event (starting within `CAL_WINDOW_MIN` minutes) next to the app name on the left island. Default `0` (off) |
-| `AUTOMAX`, `AUTOMAX_INCLUDE`, `AUTOMAX_EXCLUDE` | auto-maximise new windows via Rectangle |
-| `PILO_ISLAND`, `PILO_ANIM` | `1` shows the Pilo circle when `pilo` is installed and running, `0` turns it off; `PILO_ANIM=0` keeps it still |
-| `NOTIF_APPS`, `TERMINAL_APP` | Dock-badge apps, terminal used by popups |
+| WM focus/workspace/maximize | Events + 30 s recovery |
+| Occupied workspace/app inventory | On expand / events while open |
+| CPU/RAM | 15 s |
+| Clock | 30 s (minute-resolution display) |
+| Wi-Fi, battery, usage, Dock badges, Tailscale | 60 s + applicable OS events |
+| Media | Event stream + 30 s fallback |
+| Volume | CoreAudio/SketchyBar events + 60 s fallback |
+| Media timeline while its popup is open | 5 s |
+| Media progress plate | 2 s while a track is available |
+| Cat / cursor / equalizer | Up to 4 / 1 / 2 Hz; changed properties batched |
+| Ports, SSD, calendar, app menus, audio device list | On click |
 
-Colours are tokens in `colors.sh`. Layout is `sketchybarrc`; each cell and popup is a script in `plugins/`; `helper/` holds the Swift sources (`helper/build.sh` rebuilds them).
+There are **no automatic HTTP requests in this configuration**. It calls local
+WM/media/audio/Tailscale utilities; their independently running applications may
+have their own networking. Explicit links open localhost services, Tailscale
+admin or screen sharing only on a click. Usage is read from local usage caches
+and session logs; no credential store or auth-token file is queried.
 
-## Notes
+Runtime IPC/lock/diagnostics live under `~/.cache/sb-island-<config-hash>` with
+directory mode 700 and file/socket mode 600. Popup actions stay in memory. Rendered popup rows (which can contain event
+names, SSIDs and peer names) are temporary private PNGs, mode 600 under the mode
+700 runtime directory. They are removed on popup close or graceful shutdown.
+Embedded, size/dimension-limited media artwork follows the same lifecycle. A forced OS/process crash may leave this one private image;
+it is cleared on the next runtime start. Diagnostics contain generic failures,
+not raw command output or labels. Invalid config leaves the old runtime active.
 
-- **Starts in one go.** The bar is built off screen and shown once every item, first value and island width is in place (about 2 s after launch), so you never see it assemble piece by piece.
-- **Recovers by itself.** After sleep or a display change it re-measures the notch and display, and if the bar's windows went missing it restarts SketchyBar (at most once every 5 minutes).
+See [security notes](docs/security.md) and [validation](docs/validation.md).
 
-- **As-is.** This is a personal setup shared for reference. It is tuned for one machine (a 1800pt-wide notch display); expect to adjust things. No support promised.
-- Nothing here talks to the network except what you click (opening URLs) - usage numbers, Wi-Fi, Tailscale and calendar data are read locally at runtime and are not part of this repository.
+## Development
 
-## Credits
+```sh
+make check                  # configuration, Bash syntax, regression tests
+bash helper/build.sh --output /tmp/sketchybar-helpers
+python3 plugins/bar.py check
+```
 
-- [SketchyBar](https://github.com/FelixKratz/SketchyBar) by Felix Kratz (GPL-3.0) - the bar itself; this repo is only configuration
-- [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) (OFL-1.1) and [Nerd Fonts](https://github.com/ryanoasis/nerd-fonts) (MIT; bundled glyph sets under their own licences, incl. Material Design Icons - Apache-2.0 - and Codicons - CC-BY-4.0). Fonts are installed by Homebrew, not redistributed here
-- [media-control](https://github.com/ungive/media-control) for now-playing data
-- The Claude and OpenAI marks in the agent cell are Nerd Font glyphs; the names and logos belong to their owners
-- Pixel icons (cat, port, Tailscale dots) were drawn for this setup
+Presentation: `plugins/layout.py` (islands, fitting, popup geometry),
+`plugins/pixels.py` (original upstream artwork, standard library PNG generation).
+Popups use explicit column budgets, adaptive alignment, bounded row counts and
+6pt outer padding. Media width follows the left island and measured notch edge,
+with 5pt gaps; controls collapse when space is limited.
 
-## License
+Core code: `plugins/runtime.py` (process/IPC/config safety), `plugins/wm.py`
+(backends), `plugins/bar.py` (events/UI), `plugins/widgets.py` (queries/actions).
+No additional Python packages are required. The small Swift helpers use macOS
+frameworks and are built locally, never downloaded as binaries.
 
-[MIT](LICENSE)
+MIT license for this configuration; SketchyBar and dependencies have their own
+licenses. Original design/configuration by garamnohhh; SketchyBar by Felix Kratz;
+media-control by ungive; JetBrains Mono by JetBrains.
+
+Bundled `assets/openai.svg` and `assets/claude.svg` are from
+[Microsoft VS Code Codicons](https://github.com/microsoft/vscode-codicons),
+licensed under CC BY 4.0 (see `assets/LICENSE.codicons`), rendered locally with
+colors matching this configuration. Other small SVGs are drawn locally for this
+configuration. There are no external SVG references or scripts in these assets.

@@ -1,24 +1,22 @@
-// Runs only while a popup is open. A click outside the bar and popup runs the command given as arguments once, then exits.
-// No polling — wakes only when a click event arrives. Exits by itself after 10 minutes (no orphans).
+// Emit one line for an outside click. No command argument or shell execution.
 import AppKit
+import Darwin
 
-let cmd = CommandLine.arguments.dropFirst().joined(separator: " ")
-
-func insideSketchybar(_ p: CGPoint) -> Bool {
+func insideBar(_ point: CGPoint) -> Bool {
   let list = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? []
-  for w in list where (w[kCGWindowOwnerName as String] as? String) == "sketchybar" {
-    if let b = w[kCGWindowBounds as String] as? NSDictionary,
-       let r = CGRect(dictionaryRepresentation: b), r.contains(p) { return true }
+  return list.contains { window in
+    guard (window[kCGWindowOwnerName as String] as? String) == "sketchybar",
+          let bounds = window[kCGWindowBounds as String] as? NSDictionary,
+          let rect = CGRect(dictionaryRepresentation: bounds) else { return false }
+    return rect.contains(point)
   }
-  return false
 }
-
 NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { _ in
-  let m = NSEvent.mouseLocation   // bottom-left origin → top-left origin
-  let h = NSScreen.screens.first?.frame.height ?? 0
-  if insideSketchybar(CGPoint(x: m.x, y: h - m.y)) { return }   // bar clicks are handled by the bar's scripts
-  let t = Process(); t.launchPath = "/bin/bash"; t.arguments = ["-c", cmd]; try? t.run(); t.waitUntilExit()
-  exit(0)
+  let mouse = NSEvent.mouseLocation
+  let height = NSScreen.screens.first?.frame.height ?? 0
+  if !insideBar(CGPoint(x: mouse.x, y: height - mouse.y)) {
+    print("outside"); fflush(stdout); exit(0)
+  }
 }
 DispatchQueue.main.asyncAfter(deadline: .now() + 600) { exit(0) }
 NSApplication.shared.setActivationPolicy(.prohibited)

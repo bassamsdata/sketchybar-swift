@@ -1,39 +1,44 @@
-// Events for the calendar popup. Reads Apple Calendar (EventKit) directly — icalBuddy reports the last day of multi-day all-day events one day short.
-//   events <YYYY-MM-01> [calendarID,…] → every event touching that month, by start. One line each: "date<TAB>text"
-//   Date: single day 09.23 · multi-day (even across months) 09.23-09.26 — always the real start and end dates
+// Calendar titles travel as JSON strings, never tab-separated commands.
 import EventKit
-let a = CommandLine.arguments
-let d = DateFormatter(); d.dateFormat = "yyyy-MM-dd"
-//   events today                       → today's timed events that haven't ended yet (including ongoing), all calendars, by start. "HH:mm<TAB>title"
-if a.count > 1 && a[1] == "today" {
-  let s = EKEventStore(), cal = Calendar.current, now = Date()
-  let st = cal.startOfDay(for: now), en = cal.date(byAdding: .day, value: 1, to: st)!
-  let hm = DateFormatter(); hm.dateFormat = "HH:mm"
-  for e in s.events(matching: s.predicateForEvents(withStart: st, end: en, calendars: nil))
-      .filter({ !$0.isAllDay && $0.endDate > now }).sorted(by: { $0.startDate < $1.startDate }) {
-    print("\(hm.string(from: e.startDate))\t\(e.title ?? "")")
+import Foundation
+
+func emit(_ value: Any) {
+  if let data = try? JSONSerialization.data(withJSONObject: value) {
+    FileHandle.standardOutput.write(data)
   }
-  exit(0)
 }
-//   events calid <calendar name>       → ID of the calendar with that name (e.g. US Holidays)
-if a.count > 2 && a[1] == "calid" {
-  for c in EKEventStore().calendars(for: .event) where c.title == a[2] { print(c.calendarIdentifier); exit(0) }
-  exit(1)
+let args = CommandLine.arguments
+guard args.count >= 2 else { exit(2) }
+let store = EKEventStore()
+let granted = DispatchSemaphore(value: 0)
+if EKEventStore.authorizationStatus(for: .event) == .notDetermined {
+  store.requestFullAccessToEvents { _, _ in granted.signal() }
+  _ = granted.wait(timeout: .now() + 30)
 }
-guard a.count > 1, let from = d.date(from: a[1]) else { exit(1) }
-let cal = Calendar.current
-let to = cal.date(byAdding: .month, value: 1, to: from)!
-let ids = a.count > 2 ? Set(a[2].split(separator: ",").map(String.init)) : []
-let s = EKEventStore()
-let cals = ids.isEmpty ? nil : s.calendars(for: .event).filter { ids.contains($0.calendarIdentifier) }
-let md = DateFormatter(); md.dateFormat = "MM.dd"
-let hm = DateFormatter(); hm.dateFormat = "HH:mm"
-for e in s.events(matching: s.predicateForEvents(withStart: from, end: to, calendars: cals)).sorted(by: { $0.startDate < $1.startDate }) {
-  // An all-day event's end arrives as 23:59 that day. A timed event ending at midnight counts up to the day before
-  let last = cal.startOfDay(for: e.endDate.addingTimeInterval(e.isAllDay ? 0 : -1))
-  let first = cal.startOfDay(for: e.startDate)
-  var key = md.string(from: first)
-  if last > first { key += "-" + md.string(from: last) }
-  let t = e.isAllDay ? "" : hm.string(from: e.startDate) + " "
-  print("\(key)\t\(t)\(e.title ?? "")")
+guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else {
+  emit(["error": "calendar_permission"]); exit(0)
 }
+let names: [String] = args.count > 2 ?
+  ((try? JSONSerialization.jsonObject(with: Data(args[2].utf8))) as? [String] ?? []) : []
+let calendars = names.isEmpty ? nil : store.calendars(for: .event).filter { names.contains($0.title) }
+let calendar = Calendar.current, now = Date()
+let day = DateFormatter(); day.dateFormat = "yyyy-MM-dd"
+let start: Date
+let end: Date
+if args[1] == "today" {
+  start = calendar.startOfDay(for: now)
+  end = calendar.date(byAdding: .day, value: 1, to: start)!
+} else {
+  guard let date = day.date(from: args[1]),
+        let next = calendar.date(byAdding: .month, value: 1, to: date) else { exit(2) }
+  start = date; end = next
+}
+let date = DateFormatter(); date.dateFormat = args[1] == "today" ? "HH:mm" : "MM.dd"
+let rows: [[String: Any]] = store.events(matching: store.predicateForEvents(
+  withStart: start, end: end, calendars: calendars)).sorted { $0.startDate < $1.startDate }
+  .filter { args[1] != "today" || (!$0.isAllDay && $0.endDate > now) }
+  .map { event in
+    ["date": date.string(from: event.startDate), "title": event.title ?? "",
+     "calendar": event.calendar.title, "start": event.startDate.timeIntervalSince1970]
+  }
+emit(rows)
