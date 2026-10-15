@@ -29,9 +29,9 @@ class AppearanceTests(unittest.TestCase):
         self.assertFalse(cfg["features"]["wifi"])
         self.assertEqual(cfg["height"], 30)
         self.assertEqual(cfg["corner_radius"], 13)
-        self.assertEqual(popup_width(cfg, "clock", 1512), 255)
+        self.assertEqual(popup_width(cfg, "clock", 1512), 280)
         cfg["font_size"] = 18
-        self.assertEqual(popup_width(cfg, "clock", 1512), 382)
+        self.assertEqual(popup_width(cfg, "clock", 1512), 420)
         cfg["popup_width"] = 320
         self.assertEqual(popup_width(cfg, "clock", 1512), 320)
 
@@ -235,6 +235,33 @@ class PopupReferenceTests(unittest.IsolatedAsyncioTestCase):
             self.bar.cfg["wm_number_bold"] = False
             await widgets.workspaces(self.bar)
             self.assertIn(":Regular:", self.bar.props["workspaces", "icon.font"])
+
+    async def test_maximized_indicator_reserves_the_same_width_when_inactive(self):
+        widths = []
+        for maximized in (True, False, True):
+            self.bar.wm.read = AsyncMock(
+                return_value=Snapshot(current="12 Code", maximized=maximized)
+            )
+            await widgets.workspaces(self.bar)
+            widths.append(self.bar.props["workspaces", "label.width"])
+            self.assertIn(
+                "[max]" if maximized else "[ · ]",
+                self.bar.props["workspaces", "label"],
+            )
+        self.assertEqual(len(set(widths)), 1)
+
+    async def test_clock_date_and_time_use_separate_text_components(self):
+        await widgets.clock(self.bar)
+        self.assertRegex(self.bar.props["clock", "icon"], r"^\d{2}\.\d{2}$")
+        self.assertRegex(self.bar.props["clock", "label"], r"^\d{2}:\d{2}$")
+        args = build(self.bar)
+        start = next(
+            i for i in range(len(args)) if args[i : i + 2] == ["--set", "clock"]
+        )
+        end = next(i for i in range(start + 2, len(args)) if args[i].startswith("--"))
+        props = dict(arg.split("=", 1) for arg in args[start + 2 : end])
+        self.assertEqual(props["icon.color"], PALETTE["muted"])
+        self.assertEqual(props["icon.drawing"], "on")
 
     async def test_static_wordmark_does_not_stop_cat_animation(self):
         self.bar.animations = True

@@ -20,12 +20,35 @@ sys.path.insert(0, str(ROOT / "plugins"))
 sys.path.insert(0, str(ROOT))
 import runtime
 import widgets
-from bar import Bar
+from bar import Bar, main
 
 import install
 
 
 class ConfigurationTests(unittest.TestCase):
+    def test_reload_preserves_existing_runtime_diagnostics(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cache = Path(directory)
+            log = cache / "runtime.log"
+            log.write_text("previous runtime stopped\n")
+
+            def spawn(*args, **kwargs):
+                # Simulate the new child's diagnostic output on the inherited fd.
+                os.write(kwargs["stderr"], b"new runtime started\n")
+
+            with (
+                patch.object(sys, "argv", ["bar.py", "setup"]),
+                patch("bar.config"),
+                patch("bar.read_palette"),
+                patch("bar.send"),
+                patch("bar.cache_path", return_value=cache),
+                patch("bar.subprocess.Popen", side_effect=spawn),
+            ):
+                main()
+            self.assertEqual(
+                log.read_text(), "previous runtime stopped\nnew runtime started\n"
+            )
+
     def test_config_is_typed_data(self):
         cfg = runtime.config(ROOT)
         self.assertEqual(cfg["window_manager"], "auto")

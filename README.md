@@ -1,4 +1,4 @@
-# sketchybar-island — personal, hardened edition
+# sketchybar-swift
 
 A notch-aware SketchyBar configuration for macOS, adapted from
 [garamnohhh/sketchybar-island](https://github.com/garamnohhh/sketchybar-island).
@@ -35,7 +35,8 @@ the cat animated when `animations` is true.
 `auto` prefers a responding AeroSpace and falls back to a responding OmniWM.
 The OmniWM CLI is also found inside `/Applications/OmniWM.app`.
 
-The cell shows `3 ▾`, or `3 [max] ▾` when maximized. Click to expand a popup of
+The cell shows `3 [ · ] ▾`, or `3 [max] ▾` when maximized, reserving the same
+indicator width in both states. Click to expand a popup of
 **occupied workspaces only**, including their app names/window counts. Click a
 row to focus it. Occupied workspaces across monitors are included. An empty
 current workspace is still shown on the bar but excluded from the popup.
@@ -181,6 +182,13 @@ request Location for **SketchyBar WifiScan**, scan nearby networks and offer sav
 networks for switching. Network names are not written to disk. Without Location,
 macOS may hide the current SSID; the cell still shows on/off and the popup IP/router.
 No verbose-network logging, sudo command or Shortcuts automation is required.
+
+Claude/Codex usage popups center under the clicked provider, with screen-edge
+fallback alignment. The calendar defaults to 280pt wide (scaled with font size),
+and the date uses a muted color beside the brighter time. The ports popup matches
+directory identities rather than path spelling, so macOS case variants such as
+`~/Repos` and `~/repos` include nested projects. Listener rows show paths relative
+to `work_dir`, such as `project/design`, and deduplicate IPv4/IPv6 listeners.
 
 App-menu control and outside-click observation can require Accessibility for
 SketchyBar/helper processes. Grant only what retained features need. Basic

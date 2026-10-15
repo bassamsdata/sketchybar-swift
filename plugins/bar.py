@@ -47,8 +47,10 @@ class Bar:
         self.props = {}
         self.actions = {}
         self.popup_items = {}
+        self.popup_hosts = {}
         self.popup_images = {}
         self.open_popup = ""
+        self.popup_anchor = ""
         self.clickaway = None
         self.wm_task = None
         self.ui_task = None
@@ -134,6 +136,7 @@ class Bar:
         """Store typed actions in memory; callbacks contain only random handles."""
         if self.open_popup != parent:
             return
+        anchor = self.popup_anchor or parent
         self.actions = {k: v for k, v in self.actions.items() if v[0] != parent}
         scale = self.cfg["font_size"] / 12
         max_rows = min(
@@ -144,7 +147,7 @@ class Bar:
                 {"label": f"+{len(rows) - max_rows + 1} more"}
             ]
         width = popup_width(self.cfg, parent, self.display_frame["w"])
-        parent_data = await query("sketchybar", "--query", parent)
+        parent_data = await query("sketchybar", "--query", anchor)
         bounds = (parent_data or {}).get("bounding_rects", {})
         rect = next(iter(bounds.values()), None)
         if rect and rect["origin"][0] >= self.display_frame["x"]:
@@ -165,12 +168,21 @@ class Bar:
                 self.display_frame["x"],
                 self.display_frame["w"],
                 prefer_right=parent in ("clock", "wifi", "volume"),
+                prefer_center=parent == "usage",
             )
-            await self.set(parent, **{"popup.align": align})
+            await self.set(anchor, **{"popup.align": align})
         images = await render_rows(self, parent, title, rows, width)
         n = len(rows) + 1
         old = self.popup_items.get(parent, 0)
         args = []
+        if old and self.popup_hosts.get(parent, parent) != anchor:
+            # Popup windows belong to their host. Recreate them when switching
+            # between Claude and Codex so the popup follows the clicked cell.
+            for suffix in ["pad.top", "pad.gap", "pad.bottom"] + [
+                f"row.{i}" for i in range(old)
+            ]:
+                args += ["--remove", f"{parent}.{suffix}"]
+            old = 0
 
         def pad(suffix):
             args.extend(
@@ -178,7 +190,7 @@ class Bar:
                     "--add",
                     "item",
                     f"{parent}.pad.{suffix}",
-                    "popup." + parent,
+                    "popup." + anchor,
                     "--set",
                     f"{parent}.pad.{suffix}",
                     "icon.drawing=off",
@@ -203,7 +215,7 @@ class Bar:
                 "--add",
                 "slider" if i > 0 and rows[i - 1].get("slider") else "item",
                 f"{parent}.row.{i}",
-                "popup." + parent,
+                "popup." + anchor,
             ]
             if i > 0 and rows[i - 1].get("slider"):
                 args += ["150"]
@@ -319,26 +331,30 @@ class Bar:
                 "padding_right=0",
             ]
             self.underlines.add(parent)
-        if self.open_popup != parent:
+        if self.open_popup != parent or (self.popup_anchor or parent) != anchor:
             self.actions = {k: v for k, v in self.actions.items() if v[0] != parent}
             for path in images:
                 Path(path).unlink(missing_ok=True)
             return
         await self.sb(*args)
         self.popup_items[parent] = n
+        self.popup_hosts[parent] = anchor
         for path in self.popup_images.get(parent, []):
             Path(path).unlink(missing_ok=True)
         self.popup_images[parent] = images
         await self.set(parent + ".underline", **{"background.drawing": "on"})
-        await self.set(parent, **{"popup.drawing": "on"})
+        await self.set(anchor, **{"popup.drawing": "on"})
 
     async def close_popup(self):
         if self.open_popup:
-            await self.set(self.open_popup, **{"popup.drawing": "off"})
+            await self.set(
+                self.popup_anchor or self.open_popup, **{"popup.drawing": "off"}
+            )
             await self.set(
                 self.open_popup + ".underline", **{"background.drawing": "off"}
             )
         self.open_popup = ""
+        self.popup_anchor = ""
         self.actions.clear()
         for path in self.cache.glob("art-*"):
             path.unlink(missing_ok=True)
@@ -363,12 +379,14 @@ class Bar:
             if proc is not None:
                 await stop(proc)
 
-    async def toggle_popup(self, name):
-        if self.open_popup == name:
+    async def toggle_popup(self, name, anchor=None):
+        anchor = anchor or name
+        if self.open_popup == name and (self.popup_anchor or name) == anchor:
             await self.close_popup()
             return
         await self.close_popup()
         self.open_popup = name
+        self.popup_anchor = anchor
         self.calendar_offset = 0
         from widgets import POPUPS
 
@@ -429,7 +447,9 @@ class Bar:
                         await self.close_popup()
         elif isinstance(event, str) and event.startswith("popup."):
             name = event[6:]
-            if name in self.enabled_items():
+            if name in ("usage.claude", "usage.codex") and self.flags["usage"]:
+                await self.toggle_popup("usage", anchor=name)
+            elif name in self.enabled_items():
                 await self.toggle_popup(name)
         elif event in ("media.prev", "media.play", "media.next"):
             await self.dispatch(event)
@@ -978,7 +998,9 @@ def main():
         read_palette()
         send({"event": "shutdown"})
         log = cache_path() / "runtime.log"
-        fd = private_file(log, truncate=True)
+        # The outgoing runtime may still be logging while releasing its lock.
+        # Append atomically so reloads preserve ordered shutdown diagnostics.
+        fd = private_file(log)
         try:
             if (
                 not stat.S_ISREG(os.fstat(fd).st_mode)
@@ -986,6 +1008,7 @@ def main():
             ):
                 raise ValueError("invalid diagnostics file")
             os.fchmod(fd, 0o600)
+            fcntl.fcntl(fd, fcntl.F_SETFL, fcntl.fcntl(fd, fcntl.F_GETFL) | os.O_APPEND)
             subprocess.Popen(
                 [sys.executable, str(Path(__file__).resolve()), "daemon"],
                 stdout=subprocess.DEVNULL,

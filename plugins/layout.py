@@ -35,11 +35,20 @@ def fit_text(value, width, size=12):
 
 
 def popup_geometry(
-    parent_x, parent_width, width, screen_x, screen_width, prefer_right=False
+    parent_x,
+    parent_width,
+    width,
+    screen_x,
+    screen_width,
+    prefer_right=False,
+    prefer_center=False,
 ):
     left = parent_x
     right = parent_x + parent_width - width
-    if prefer_right and right >= screen_x + 5:
+    center = parent_x + (parent_width - width) / 2
+    if prefer_center and screen_x + 5 <= center <= screen_x + screen_width - width - 5:
+        align, anchor = "center", center
+    elif prefer_right and right >= screen_x + 5:
         align, anchor = "right", right
     elif left + width <= screen_x + screen_width - 5:
         align, anchor = "left", left
@@ -290,7 +299,12 @@ def build(bar):
         "right",
         "—",
         click_script=callback("clock"),
-        **{"popup.align": "right"},
+        **{
+            "popup.align": "right",
+            "icon.drawing": "on",
+            "icon.color": p["muted"],
+            "icon.padding_right": 7,
+        },
     )
     for name in ("volume", "wifi", "battery", "usage", "notifications"):
         if not flags[name]:
@@ -350,7 +364,7 @@ def build(bar):
                     "right",
                     "—",
                     drawing="off",
-                    click_script=callback("usage"),
+                    click_script=callback("usage." + provider),
                     **{
                         "icon.drawing": "on",
                         "icon.padding_right": 6,

@@ -13,7 +13,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from layout import fit_text
+from layout import fit_text, text_width
 from runtime import ROOT, image_size, number, private_file, query, run, stop, text
 
 
@@ -40,6 +40,8 @@ async def workspaces(bar):
         label = text(snapshot.current_name or label, 12)
     if snapshot.maximized:
         label += " [max]"
+    elif snapshot.current:
+        label += " [ · ]"
     label = text(label, 20)
     match = re.match(r"^([0-9]+)(.*)$", label)
     number = match.group(1) if match else ""
@@ -54,6 +56,7 @@ async def workspaces(bar):
             "icon.font": f"{bar.cfg['font']}:{weight}:{bar.cfg['font_size']}",
             "icon.padding_left": 8 if number else 0,
             "label.padding_left": 0 if number else 8,
+            "label.width": round(text_width(suffix + " ▾", bar.cfg["font_size"])),
         },
     )
     await bar.refit_media()
@@ -81,7 +84,8 @@ async def workspaces(bar):
 
 
 async def clock(bar):
-    await bar.set("clock", label=datetime.now().strftime("%m.%d %H:%M"))
+    now = datetime.now()
+    await bar.set("clock", icon=now.strftime("%m.%d"), label=now.strftime("%H:%M"))
 
 
 async def calendar_popup(bar):
@@ -588,8 +592,29 @@ async def system_popup(bar):
     )
 
 
+def project_relative_path(path, root):
+    """Match real directory identities, including case-insensitive macOS paths."""
+    parts = []
+    for ancestor in (path, *path.parents):
+        try:
+            if ancestor.samefile(root):
+                return Path(*reversed(parts))
+        except OSError:
+            pass
+        parts.append(ancestor.name)
+    return None
+
+
 async def ports_popup(bar):
-    out = await run("lsof", "-nP", "-iTCP", "-sTCP:LISTEN", "-Fpcn", timeout=5)
+    out = await run(
+        "lsof",
+        "-nP",
+        "-iTCP",
+        "-sTCP:LISTEN",
+        "-Fpcn",
+        timeout=5,
+        allow_failure=True,
+    )
     entries, pid, proc = [], "", ""
     for line in out.splitlines():
         if line.startswith("p"):
@@ -602,7 +627,16 @@ async def ports_popup(bar):
                 entries.append((pid, proc, int(port)))
     pids = sorted({p for p, _, _ in entries})
     cwd = (
-        await run("lsof", "-a", "-d", "cwd", "-p", ",".join(pids), "-Fpn")
+        await run(
+            "lsof",
+            "-a",
+            "-d",
+            "cwd",
+            "-p",
+            ",".join(pids),
+            "-Fpn",
+            allow_failure=True,
+        )
         if pids
         else ""
     )
@@ -616,16 +650,16 @@ async def ports_popup(bar):
     rows, seen = [], set()
     for pid, proc, port in sorted(entries, key=lambda e: e[2]):
         path = dirs.get(pid)
+        relative = project_relative_path(path, root) if path is not None else None
         if (
-            path is None
-            or (path != root and root not in path.parents)
+            relative is None
             or port in seen
             or proc.lower().startswith(("docker", "orbstack", "ollama"))
         ):
             continue
         seen.add(port)
         rows.append(
-            row(":" + str(port), path.name + " · " + proc, bar.action("port", port))
+            row(":" + str(port), str(relative) + " · " + proc, bar.action("port", port))
         )
     await bar.popup(
         "ports", "PORTS", rows or [row("", "No listeners under " + str(root))]

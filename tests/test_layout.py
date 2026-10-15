@@ -29,6 +29,26 @@ PALETTE = {
 
 
 class GeometryTests(unittest.TestCase):
+    def test_centered_popup_prefers_parent_center_and_fits_at_screen_edges(self):
+        for screen_x in (0, -1920, 1512):
+            for offset in (5, 700, 1400):
+                x = screen_x + offset
+                align, shift = popup_geometry(
+                    x, 50, 368, screen_x, 1512, prefer_center=True
+                )
+                left = (
+                    x
+                    if align == "left"
+                    else x + 50 - 368
+                    if align == "right"
+                    else x + (50 - 368) / 2
+                )
+                self.assertEqual(shift, 0)
+                self.assertGreaterEqual(left, screen_x + 5)
+                self.assertLessEqual(left + 368, screen_x + 1512 - 5)
+                if offset == 700:
+                    self.assertEqual(align, "center")
+
     def test_long_and_wide_text_fits_the_actual_column(self):
         for value in ("x" * 200, "会議" * 50, "cafe\u0301 " * 40, "short"):
             for width in (0, 30, 72, 240):
@@ -138,6 +158,35 @@ class PopupTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(props["padding_left"], "0")
         self.assertEqual(props["padding_right"], "0")
+
+    async def test_agent_popup_follows_clicked_provider_and_reparents_rows(self):
+        self.bar.open_popup = "usage"
+        parent = {
+            "bounding_rects": {"display-1": {"origin": [1000, 5], "size": [50, 30]}}
+        }
+        with (
+            patch("bar.query", new_callable=AsyncMock, return_value=parent) as query,
+            patch("bar.render_rows", new_callable=AsyncMock, return_value=[]),
+        ):
+            for host in ("usage.claude", "usage.codex"):
+                self.bar.popup_anchor = host
+                self.bar.sb.reset_mock()
+                await self.bar.popup("usage", "USAGE", [{"label": "usage"}])
+                query.assert_awaited_with("sketchybar", "--query", host)
+                self.assertEqual(self.bar.props[host, "popup.align"], "center")
+                args = next(
+                    c.args
+                    for c in self.bar.sb.call_args_list
+                    if "usage.row.0" in c.args
+                )
+                self.assertIn("popup." + host, args)
+                if host == "usage.codex":
+                    self.assertEqual(args[:2], ("--remove", "usage.pad.top"))
+                    self.assertIn("usage.row.1", args)
+                self.assertEqual(self.bar.popup_hosts["usage"], host)
+                await self.bar.close_popup()
+                self.assertEqual(self.bar.props[host, "popup.drawing"], "off")
+                self.bar.open_popup = "usage"
 
     async def test_many_calendar_events_fit_short_screens(self):
         self.bar.display_frame["h"] = 600

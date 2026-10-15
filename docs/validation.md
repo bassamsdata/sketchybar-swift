@@ -38,6 +38,14 @@ macOS permissions during development.
   Settings click callback opened/closed its popup before and after a simulated
   `system_woke` event; that event also closed the stale popup. This checks event
   handling, not a physical sleep/wake cycle.
+- Popup/layout regressions cover centered agent anchors, moving shared rows
+  between Claude/Codex hosts, equal maximized/normal indicator widths, and
+  separate date/time text. Ports regressions cover nested project paths,
+  case-insensitive directory identity, symlinked roots, IPv4/IPv6 deduplication
+  and excluded processes. Live checks confirmed each agent popup center within
+  0.5pt of its host, a 280pt calendar, muted date/brighter time, and both listeners
+  on ports 4321 and 4323 under the nested project folder. Reload diagnostics
+  append atomically so an outgoing process cannot overwrite the new startup log.
 
 On additional machines, inspect notch/external-monitor layouts, switch workspaces
 and toggle AeroSpace fullscreen, open occupied-workspace/media/volume popups,

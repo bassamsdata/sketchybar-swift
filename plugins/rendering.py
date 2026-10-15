@@ -6,7 +6,7 @@ import secrets
 from runtime import ROOT, run, text
 
 WIDTHS = {
-    "clock": 255,
+    "clock": 280,
     "wifi": 261,
     "volume": 261,
     "usage": 368,
